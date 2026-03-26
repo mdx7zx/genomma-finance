@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard Financiero — Genomma Lab Internacional 2023–2025</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="ventas_2025_data.js"></script>
 <style>
 :root{--sb:#0f1923;--sb2:#162030;--sb3:#1e2d40;--acc:#00843D;--acc2:#00b356;--acc3:#34d399;--bg:#f0f4f8;--card:#fff;--brd:#e2e8f0;--t1:#0f172a;--t2:#334155;--t3:#64748b;--t4:#94a3b8;--grn:#10b981;--grn2:#dcfce7;--grn3:#166534;--yel:#f59e0b;--yel2:#fef9c3;--yel3:#92400e;--red:#ef4444;--red2:#fee2e2;--red3:#7f1d1d;--blu:#3b82f6;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -137,6 +138,27 @@ tr:hover td{background:#f8fafc;}
 .inv-hl-item .hl-sub{font-size:10px;color:var(--t3);margin-top:3px;}
 .inv-hl-item .hl-chg{font-size:11px;font-weight:700;margin-top:2px;}
 .inv-disclaimer{font-size:9.5px;color:var(--t4);margin-top:14px;padding-top:10px;border-top:1px solid #f1f5f9;font-style:italic;line-height:1.5;}
+/* ---- VENTAS MODULE ---- */
+.vt-tabs{display:flex;gap:4px;margin-bottom:18px;flex-wrap:wrap;}
+.vt-tab{padding:8px 18px;border-radius:7px;border:1px solid var(--brd);cursor:pointer;font-size:12px;font-weight:700;color:var(--t3);background:var(--card);transition:all .15s;}
+.vt-tab:hover{color:var(--t1);border-color:var(--acc);}
+.vt-tab.act{background:var(--acc);color:#fff;border-color:var(--acc);}
+.vt-filter{display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap;}
+.vt-filter select{padding:6px 10px;border:1px solid var(--brd);border-radius:6px;font-size:12px;background:#fff;cursor:pointer;}
+.vt-bar{height:20px;border-radius:4px;transition:width .4s ease;}
+.vt-hbar{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.vt-hbar-label{width:100px;font-size:11px;font-weight:600;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vt-hbar-wrap{flex:1;height:22px;background:#f1f5f9;border-radius:5px;overflow:hidden;}
+.vt-hbar-fill{height:100%;border-radius:5px;transition:width .5s ease;}
+.vt-hbar-val{width:70px;text-align:right;font-size:11px;font-weight:700;}
+.vt-seg{display:flex;height:30px;border-radius:6px;overflow:hidden;margin:8px 0;}
+.vt-seg div{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;transition:width .4s ease;}
+.vt-insight{background:linear-gradient(135deg,#f0fdf4,#fff);border:1px solid #bbf7d0;border-radius:10px;padding:14px 18px;margin-bottom:14px;}
+.vt-insight-title{font-size:11px;font-weight:800;color:var(--acc);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.vt-insight p{font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:6px;}
+.vt-insight strong{color:var(--t1);}
+.vt-insight .up{color:var(--grn);font-weight:700;}
+.vt-insight .dn{color:var(--red);font-weight:700;}
 /* ---- CHAT ---- */
 #chat-toggle{position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#00843D,#00b356);color:#fff;border:none;cursor:pointer;font-size:24px;box-shadow:0 4px 20px rgba(0,132,61,.35);z-index:1000;display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s;}
 #chat-toggle:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(0,132,61,.45);}
@@ -179,6 +201,7 @@ tr:hover td{background:#f8fafc;}
     <div class="sb-btn act" onclick="nav('general')" id="btn-general"><span class="ic">📊</span>Vista General</div>
     <div class="sb-btn" onclick="nav('consolidado')" id="btn-consolidado"><span class="ic">🌐</span>Consolidado Total</div>
     <div class="sb-btn" onclick="nav('benchmark')" id="btn-benchmark"><span class="ic">📈</span>Benchmarking</div>
+    <div class="sb-btn" onclick="nav('ventas')" id="btn-ventas"><span class="ic">🛒</span>Ventas por Marca</div>
   </div>
   <div id="cnt-nav"></div>
 </div>
@@ -456,6 +479,483 @@ function mkChart(id,config){
   _charts[id]=new Chart(el,config);
 }
 
+// ═══════════════════ VENTAS POR MARCA MODULE (2025 data) ═══════════════════
+function renderVentas(){
+  // Support both old VENTAS and new VENTAS_MARCA/VENTAS_CLIENTE/VENTAS_SEGMENTO
+  const hasNew=(typeof VENTAS_MARCA!=='undefined'&&typeof VENTAS_CLIENTE!=='undefined'&&typeof VENTAS_SEGMENTO!=='undefined');
+  const VM=hasNew?VENTAS_MARCA:{};
+  const VC=hasNew?VENTAS_CLIENTE:{};
+  const VS=hasNew?VENTAS_SEGMENTO:{};
+  const M=1000000; // raw to MM MXN
+  const fmtV=v=>v!==null&&v!==undefined&&!isNaN(v)?(v/1).toLocaleString('es-MX',{minimumFractionDigits:1,maximumFractionDigits:1}):'—';
+  const fmtP=v=>v!==null&&v!==undefined&&!isNaN(v)&&isFinite(v)?((v>=0?'+':'')+v.toFixed(1)+'%'):'—';
+  const varP=(a,b)=>a&&Math.abs(a)>0.001?((b-a)/Math.abs(a)*100):null;
+  const cVar=v=>v===null?'color:#94a3b8':v>=0?'color:#10b981':'color:#ef4444';
+
+  // Get all countries present in VENTAS_MARCA
+  const countries=Object.keys(VM).filter(c=>ACTIVE.includes(c)).sort();
+
+  // Build aggregated global brand list from VENTAS_MARCA
+  // Each entry: {b: brand, s: segment, q1v,q1c,q2v,q2c,q3v,q3c,q4v,q4c, tv,tc}
+  // Values are raw MXN — divide by M to get MM MXN
+  function globalBrands(){
+    const map={};
+    countries.forEach(co=>{
+      const arr=VM[co]||[];
+      arr.forEach(br=>{
+        const key=(br.b||'').toUpperCase().trim();
+        if(!key)return;
+        if(!map[key])map[key]={brand:br.b,segment:br.s||'',countries:[],
+          q1v:0,q1c:0,q2v:0,q2c:0,q3v:0,q3c:0,q4v:0,q4c:0,tv:0,tc:0};
+        map[key].q1v+=(br.q1v||0)/M; map[key].q1c+=(br.q1c||0)/M;
+        map[key].q2v+=(br.q2v||0)/M; map[key].q2c+=(br.q2c||0)/M;
+        map[key].q3v+=(br.q3v||0)/M; map[key].q3c+=(br.q3c||0)/M;
+        map[key].q4v+=(br.q4v||0)/M; map[key].q4c+=(br.q4c||0)/M;
+        map[key].tv+=(br.tv||0)/M;   map[key].tc+=(br.tc||0)/M;
+        if(!map[key].countries.includes(co))map[key].countries.push(co);
+      });
+    });
+    return Object.values(map).sort((a,b)=>b.tv-a.tv);
+  }
+
+  // Get segment totals across all countries
+  function globalSegTotals(){
+    let otcV=0,otcC=0,pcV=0,pcC=0,totV=0,totC=0;
+    countries.forEach(co=>{
+      const sg=VS[co]||{};
+      otcV+=(sg.otcV||0)/M; otcC+=(sg.otcC||0)/M;
+      pcV+=(sg.pcV||0)/M;   pcC+=(sg.pcC||0)/M;
+      totV+=(sg.totV||0)/M; totC+=(sg.totC||0)/M;
+    });
+    // fallback: sum from brands
+    if(totV===0){const gb=globalBrands();totV=gb.reduce((a,b)=>a+b.tv,0);otcV=gb.filter(b=>b.segment==='OTC').reduce((a,b)=>a+b.tv,0);pcV=gb.filter(b=>b.segment==='PC').reduce((a,b)=>a+b.tv,0);}
+    return{otcV,otcC,pcV,pcC,totV,totC};
+  }
+
+  // Country client list from VENTAS_CLIENTE
+  // {n: name, q1, q2, q3, q4, t: total} — raw MXN
+  function countryClients(co){
+    const arr=VC[co]||[];
+    return arr.map(cl=>({
+      n:cl.n,
+      q1:(cl.q1||0)/M, q2:(cl.q2||0)/M,
+      q3:(cl.q3||0)/M, q4:(cl.q4||0)/M,
+      t:(cl.t||0)/M
+    })).sort((a,b)=>b.t-a.t);
+  }
+
+  // Country brands from VENTAS_MARCA
+  function countryBrands(co){
+    const arr=VM[co]||[];
+    return arr.map(br=>({
+      b:br.b, s:br.s||'',
+      q1v:(br.q1v||0)/M, q1c:(br.q1c||0)/M,
+      q2v:(br.q2v||0)/M, q2c:(br.q2c||0)/M,
+      q3v:(br.q3v||0)/M, q3c:(br.q3c||0)/M,
+      q4v:(br.q4v||0)/M, q4c:(br.q4c||0)/M,
+      tv:(br.tv||0)/M, tc:(br.tc||0)/M
+    })).sort((a,b)=>b.tv-a.tv);
+  }
+
+  function buildOverview(){
+    const gb=globalBrands();
+    const seg=globalSegTotals();
+    const totalVta=seg.totV||gb.reduce((a,b)=>a+b.tv,0);
+    const otcVta=seg.otcV;
+    const pcVta=seg.pcV;
+    const otroVta=Math.max(0,totalVta-otcVta-pcVta);
+    const top10=gb.slice(0,10);
+    const maxVta=top10.length>0?top10[0].tv:1;
+    const activeBrands=gb.filter(b=>b.tv>0.5).length;
+
+    // KPI Row
+    let html='<div class="kpi-row">';
+    html+=`<div class="kc" style="border-left:4px solid var(--acc);"><div class="klbl">VENTAS TOTALES POR MARCA</div><div class="kval" style="color:var(--acc);">${fmtV(totalVta)} MM</div><div class="kch neu">Consolidado 16 Paises</div></div>`;
+    const otcPct=totalVta>0?(otcVta/totalVta*100):0;
+    const pcPct=totalVta>0?(pcVta/totalVta*100):0;
+    html+=`<div class="kc" style="border-left:4px solid #00843D;"><div class="klbl">SEGMENTO OTC</div><div class="kval">${fmtV(otcVta)} MM</div><div class="kch neu">${otcPct.toFixed(1)}% del total</div></div>`;
+    html+=`<div class="kc" style="border-left:4px solid #3b82f6;"><div class="klbl">SEGMENTO PC</div><div class="kval">${fmtV(pcVta)} MM</div><div class="kch neu">${pcPct.toFixed(1)}% del total</div></div>`;
+    html+=`<div class="kc" style="border-left:4px solid #f59e0b;"><div class="klbl">MARCAS ACTIVAS</div><div class="kval">${activeBrands}</div><div class="kch neu">en ${countries.length} paises</div></div>`;
+    const mgBrutoGlobal=totalVta>0?((totalVta-seg.totC)/totalVta*100):0;
+    html+=`<div class="kc" style="border-left:4px solid #8b5cf6;"><div class="klbl">MARGEN BRUTO GLOBAL</div><div class="kval">${mgBrutoGlobal.toFixed(1)}%</div><div class="kch neu">Vta - Costo / Vta</div></div>`;
+    html+='</div>';
+
+    // Segmentation bar
+    const total=otcVta+pcVta+otroVta||1;
+    html+=`<div class="cc" style="margin-bottom:18px;"><div class="ct">Composicion por Segmento — Ventas 2025</div>
+      <div class="vt-seg">
+        <div style="width:${(otcVta/total*100).toFixed(1)}%;background:#00843D;" title="OTC: ${fmtV(otcVta)} MM">OTC ${(otcVta/total*100).toFixed(0)}%</div>
+        <div style="width:${(pcVta/total*100).toFixed(1)}%;background:#3b82f6;" title="PC: ${fmtV(pcVta)} MM">PC ${(pcVta/total*100).toFixed(0)}%</div>
+        ${otroVta>0.5?`<div style="width:${(otroVta/total*100).toFixed(1)}%;background:#f59e0b;" title="Otros: ${fmtV(otroVta)} MM">Otros ${(otroVta/total*100).toFixed(0)}%</div>`:''}
+      </div>
+      <div style="display:flex;gap:20px;margin-top:10px;font-size:11px;color:var(--t3);">
+        <span><b style="color:#00843D;">OTC:</b> ${fmtV(otcVta)} MM — Mg Bruto: ${seg.otcV>0?((seg.otcV-seg.otcC)/seg.otcV*100).toFixed(1):'—'}%</span>
+        <span><b style="color:#3b82f6;">PC:</b> ${fmtV(pcVta)} MM — Mg Bruto: ${seg.pcV>0?((seg.pcV-seg.pcC)/seg.pcV*100).toFixed(1):'—'}%</span>
+      </div></div>`;
+
+    // Top 10 brands bar chart (2025)
+    html+='<div class="cg2"><div class="cc"><div class="ct">Top 10 Marcas Globales — Ventas 2025 (MM MXN)</div>';
+    top10.forEach((br,i)=>{
+      const pct=maxVta>0?(br.tv/maxVta*100):0;
+      const segColor=br.segment==='OTC'?'#00843D':br.segment==='PC'?'#3b82f6':'#f59e0b';
+      const mgBr=br.tv>0?((br.tv-br.tc)/br.tv*100):0;
+      html+=`<div class="vt-hbar">
+        <div class="vt-hbar-label" title="${br.brand}">${i+1}. ${br.brand}</div>
+        <div class="vt-hbar-wrap"><div class="vt-hbar-fill" style="width:${pct.toFixed(1)}%;background:${segColor};"></div></div>
+        <div class="vt-hbar-val">${fmtV(br.tv)}</div>
+        <div style="width:55px;text-align:right;font-size:10px;font-weight:600;color:#64748b;">${mgBr.toFixed(0)}% mb</div>
+      </div>`;
+    });
+    html+='</div>';
+
+    // Country sales ranking
+    html+='<div class="cc"><div class="ct">Ventas por Pais — Participacion 2025</div>';
+    const coSales=countries.map(co=>{
+      const arr=VM[co]||[];
+      const tv=arr.reduce((a,b)=>a+(b.tv||0)/M,0);
+      return{co,tv};
+    }).sort((a,b)=>b.tv-a.tv);
+    const maxCS=coSales.length>0?coSales[0].tv:1;
+    coSales.forEach((cs,i)=>{
+      const pct=maxCS>0?(cs.tv/maxCS*100):0;
+      const pctTotal=totalVta>0?(cs.tv/totalVta*100):0;
+      html+=`<div class="vt-hbar">
+        <div class="vt-hbar-label" title="${CNAMES[cs.co]||cs.co}">${i+1}. ${(CNAMES[cs.co]||cs.co).split('(')[0].trim()}</div>
+        <div class="vt-hbar-wrap"><div class="vt-hbar-fill" style="width:${pct.toFixed(1)}%;background:#00843D;"></div></div>
+        <div class="vt-hbar-val">${fmtV(cs.tv)}</div>
+        <div style="width:45px;text-align:right;font-size:10px;color:#64748b;">${pctTotal.toFixed(1)}%</div>
+      </div>`;
+    });
+    html+='</div></div>';
+
+    // Detailed brand table Top 25
+    html+=`<div class="tc"><div class="ct" style="font-size:14px;font-weight:800;">Analisis Detallado por Marca — Top 25 (MM MXN)</div>
+      <table><thead><tr style="background:#0f1923;color:#fff;">
+        <th style="text-align:left;padding:8px;">Rank</th>
+        <th style="text-align:left;padding:8px;">Marca</th>
+        <th style="text-align:center;padding:8px;">Segm.</th>
+        <th style="padding:8px;">Paises</th>
+        <th style="padding:8px;">Q1</th>
+        <th style="padding:8px;">Q2</th>
+        <th style="padding:8px;">Q3</th>
+        <th style="padding:8px;">Q4</th>
+        <th style="padding:8px;font-weight:800;">Total Vta</th>
+        <th style="padding:8px;">Total Cto</th>
+        <th style="padding:8px;">Mg Bruto</th>
+      </tr></thead><tbody>`;
+    gb.slice(0,25).forEach((br,i)=>{
+      const mgBruto=br.tv>0?((br.tv-br.tc)/br.tv*100):0;
+      const hl=i<3?'background:#f0fdf4;':'';
+      html+=`<tr style="${hl}">
+        <td style="text-align:center;"><span class="rank">${i+1}</span></td>
+        <td style="font-weight:700;">${br.brand}</td>
+        <td style="text-align:center;"><span class="bdg ${br.segment==='OTC'?'bg':br.segment==='PC'?'by':'bna'}">${br.segment||'—'}</span></td>
+        <td style="text-align:center;">${br.countries.length}</td>
+        <td>${fmtV(br.q1v)}</td>
+        <td>${fmtV(br.q2v)}</td>
+        <td>${fmtV(br.q3v)}</td>
+        <td>${fmtV(br.q4v)}</td>
+        <td style="font-weight:800;">${fmtV(br.tv)}</td>
+        <td style="color:var(--t3);">${fmtV(br.tc)}</td>
+        <td style="font-weight:700;color:${mgBruto>=50?'#10b981':mgBruto>=30?'#f59e0b':'#ef4444'}">${mgBruto.toFixed(1)}%</td>
+      </tr>`;
+    });
+    html+='</tbody></table></div>';
+
+    // Growing / declining brands insights
+    const growing=gb.filter(br=>br.tv>2&&br.q4v>0&&br.q1v>0&&(br.q4v-br.q1v)/br.q1v>0.05).sort((a,b)=>(b.q4v-b.q1v)/b.q1v-(a.q4v-a.q1v)/a.q1v);
+    const declining=gb.filter(br=>br.tv>2&&br.q4v>0&&br.q1v>0&&(br.q4v-br.q1v)/br.q1v<-0.05).sort((a,b)=>(a.q4v-a.q1v)/a.q1v-(b.q4v-b.q1v)/b.q1v);
+
+    html+='<div class="cg2">';
+    html+='<div class="vt-insight"><div class="vt-insight-title">Marcas con Dinamismo Creciente (Q4 > Q1)</div>';
+    if(growing.length>0){
+      growing.slice(0,8).forEach(br=>{
+        const chg=((br.q4v-br.q1v)/br.q1v*100);
+        html+=`<p><strong>${br.brand}</strong> (${br.segment||'—'}): <span class="up">+${chg.toFixed(1)}%</span> intra-anual — ${br.countries.length} paises, ${fmtV(br.tv)} MM</p>`;
+      });
+    } else {html+='<p>Sin tendencias de crecimiento intra-anual significativas.</p>';}
+    html+='</div>';
+
+    html+='<div class="vt-insight" style="background:linear-gradient(135deg,#fef2f2,#fff);border-color:#fecaca;"><div class="vt-insight-title" style="color:#ef4444;">Marcas con Presion / Contraccion Intra-Anual</div>';
+    if(declining.length>0){
+      declining.slice(0,8).forEach(br=>{
+        const chg=((br.q4v-br.q1v)/br.q1v*100);
+        html+=`<p><strong>${br.brand}</strong> (${br.segment||'—'}): <span class="dn">${chg.toFixed(1)}%</span> intra-anual — ${br.countries.length} paises, ${fmtV(br.tv)} MM</p>`;
+      });
+    } else {html+='<p>Sin marcas con contraccion intra-anual significativa.</p>';}
+    html+='</div></div>';
+
+    // Brand evolution by quarter (top 5)
+    html+=`<div class="tc"><div class="ct" style="font-size:13px;font-weight:800;">Evolucion por Trimestre — Top 10 Marcas (MM MXN)</div>
+      <table style="font-size:11px;">
+        <thead><tr style="background:#0f1923;color:#fff;">
+          <th style="text-align:left;padding:8px;">Marca</th><th style="text-align:center;">Seg.</th>
+          <th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th>
+          <th>Q2/Q1 %</th><th>Q3/Q2 %</th><th>Q4/Q3 %</th>
+          <th style="font-weight:800;">Total</th>
+        </tr></thead><tbody>`;
+    gb.slice(0,10).forEach((br,i)=>{
+      const q12=br.q1v>0?varP(br.q1v,br.q2v):null;
+      const q23=br.q2v>0?varP(br.q2v,br.q3v):null;
+      const q34=br.q3v>0?varP(br.q3v,br.q4v):null;
+      const hl=i<3?'background:#f0fdf4;':'i%2===0?"":#f8fafc';
+      html+=`<tr style="${i<3?'background:#f0fdf4;':i%2===0?'':'background:#f8fafc;'}">
+        <td style="font-weight:${i<3?'800':'600'};font-size:11px;">${br.brand}</td>
+        <td style="text-align:center;"><span class="bdg ${br.segment==='OTC'?'bg':br.segment==='PC'?'by':'bna'}" style="font-size:9px;">${br.segment||'—'}</span></td>
+        <td style="text-align:right;">${fmtV(br.q1v)}</td>
+        <td style="text-align:right;">${fmtV(br.q2v)}</td>
+        <td style="text-align:right;">${fmtV(br.q3v)}</td>
+        <td style="text-align:right;">${fmtV(br.q4v)}</td>
+        <td style="text-align:right;${cVar(q12)};font-weight:700;">${fmtP(q12)}</td>
+        <td style="text-align:right;${cVar(q23)};font-weight:700;">${fmtP(q23)}</td>
+        <td style="text-align:right;${cVar(q34)};font-weight:700;">${fmtP(q34)}</td>
+        <td style="text-align:right;font-weight:800;">${fmtV(br.tv)}</td>
+      </tr>`;
+    });
+    html+='</tbody></table></div>';
+
+    return html;
+  }
+
+  function buildCountryView(selCountry){
+    const brands=countryBrands(selCountry);
+    if(!brands||brands.length===0)return`<div class="alr alr-y">Sin datos de marcas disponibles para ${CNAMES[selCountry]||selCountry}.</div>`;
+    const clients=countryClients(selCountry);
+    const sg=VS[selCountry]||{};
+    const totalV=brands.reduce((a,b)=>a+b.tv,0);
+    const otcV=brands.filter(b=>b.s==='OTC').reduce((a,b)=>a+b.tv,0);
+    const pcV=brands.filter(b=>b.s==='PC').reduce((a,b)=>a+b.tv,0);
+    const totalC=brands.reduce((a,b)=>a+b.tc,0);
+    const mgBruto=totalV>0?((totalV-totalC)/totalV*100):0;
+    const maxV=brands.length>0?brands[0].tv:1;
+
+    let html=`<div class="sdiv"><span>${CNAMES[selCountry]||selCountry} — Ventas por Marca 2025</span><hr></div>`;
+    html+='<div class="kpi-row">';
+    html+=`<div class="kc" style="border-left:4px solid var(--acc);"><div class="klbl">VENTAS TOTALES</div><div class="kval">${fmtV(totalV)} MM</div></div>`;
+    html+=`<div class="kc" style="border-left:4px solid #00843D;"><div class="klbl">OTC</div><div class="kval">${fmtV(otcV)} MM</div><div class="kch neu">${totalV>0?(otcV/totalV*100).toFixed(0)+'% del total':'—'}</div></div>`;
+    html+=`<div class="kc" style="border-left:4px solid #3b82f6;"><div class="klbl">PC</div><div class="kval">${fmtV(pcV)} MM</div><div class="kch neu">${totalV>0?(pcV/totalV*100).toFixed(0)+'% del total':'—'}</div></div>`;
+    html+=`<div class="kc" style="border-left:4px solid #8b5cf6;"><div class="klbl">MARCAS ACTIVAS</div><div class="kval">${brands.filter(b=>b.tv>0).length}</div></div>`;
+    html+=`<div class="kc" style="border-left:4px solid #f59e0b;"><div class="klbl">MARGEN BRUTO</div><div class="kval">${mgBruto.toFixed(1)}%</div></div>`;
+    html+='</div>';
+
+    // Segmentation bar
+    const segTotal=otcV+pcV||1;
+    html+=`<div class="cc" style="margin-bottom:14px;"><div class="ct">Mix OTC / PC</div>
+      <div class="vt-seg">
+        <div style="width:${(otcV/segTotal*100).toFixed(1)}%;background:#00843D;">OTC ${(otcV/segTotal*100).toFixed(0)}%</div>
+        <div style="width:${(pcV/segTotal*100).toFixed(1)}%;background:#3b82f6;">PC ${(pcV/segTotal*100).toFixed(0)}%</div>
+      </div></div>`;
+
+    // Top brands bar chart
+    html+='<div class="cc" style="margin-bottom:18px;"><div class="ct">Marcas por Ventas — 2025</div>';
+    brands.filter(b=>b.tv>0).slice(0,15).forEach((br,i)=>{
+      const pct=maxV>0?(br.tv/maxV*100):0;
+      const segColor=br.s==='OTC'?'#00843D':br.s==='PC'?'#3b82f6':'#f59e0b';
+      const mgBr=br.tv>0?((br.tv-br.tc)/br.tv*100):0;
+      html+=`<div class="vt-hbar">
+        <div class="vt-hbar-label" title="${br.b}">${i+1}. ${br.b}</div>
+        <div class="vt-hbar-wrap"><div class="vt-hbar-fill" style="width:${pct.toFixed(1)}%;background:${segColor};"></div></div>
+        <div class="vt-hbar-val">${fmtV(br.tv)}</div>
+        <div style="width:50px;text-align:right;font-size:10px;color:#64748b;">${mgBr.toFixed(0)}% mb</div>
+      </div>`;
+    });
+    html+='</div>';
+
+    // Detailed brand table
+    html+=`<div class="tc"><div class="ct">Detalle por Marca — ${CNAMES[selCountry]||selCountry}</div>
+      <table><thead><tr style="background:#0f1923;color:#fff;">
+        <th style="text-align:left;">Marca</th><th style="text-align:center;">Seg.</th>
+        <th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th>
+        <th style="font-weight:800;">Total Vta</th><th>Total Cto</th><th>Mg Bruto</th>
+      </tr></thead><tbody>`;
+    brands.filter(b=>Math.abs(b.tv)>0.01).forEach(br=>{
+      const mgBr=br.tv>0?((br.tv-br.tc)/br.tv*100):0;
+      html+=`<tr>
+        <td style="font-weight:600;">${br.b}</td>
+        <td style="text-align:center;"><span class="bdg ${br.s==='OTC'?'bg':br.s==='PC'?'by':'bna'}">${br.s||'—'}</span></td>
+        <td>${fmtV(br.q1v)}</td><td>${fmtV(br.q2v)}</td><td>${fmtV(br.q3v)}</td><td>${fmtV(br.q4v)}</td>
+        <td style="font-weight:700;">${fmtV(br.tv)}</td>
+        <td style="color:var(--t3);">${fmtV(br.tc)}</td>
+        <td style="font-weight:700;color:${mgBr>=50?'#10b981':mgBr>=30?'#f59e0b':'#ef4444'}">${mgBr.toFixed(1)}%</td>
+      </tr>`;
+    });
+    html+='</tbody></table></div>';
+
+    // Client analysis
+    if(clients.length>0){
+      const totalClVta=clients.reduce((a,b)=>a+Math.max(b.t,0),0);
+      const top5Pct=totalClVta>0?(clients.slice(0,5).reduce((a,b)=>a+Math.max(b.t,0),0)/totalClVta*100):0;
+      const top10Pct=totalClVta>0?(clients.slice(0,10).reduce((a,b)=>a+Math.max(b.t,0),0)/totalClVta*100):0;
+      html+=`<div class="sdiv"><span>Analisis de Clientes — ${CNAMES[selCountry]||selCountry}</span><hr></div>`;
+      html+='<div class="kpi-row">';
+      html+=`<div class="kc"><div class="klbl">TOTAL CLIENTES</div><div class="kval">${clients.length}</div></div>`;
+      html+=`<div class="kc"><div class="klbl">CONCENTRACION TOP 5</div><div class="kval ${top5Pct>60?'neg':''}">${top5Pct.toFixed(1)}%</div></div>`;
+      html+=`<div class="kc"><div class="klbl">CONCENTRACION TOP 10</div><div class="kval ${top10Pct>80?'neg':''}">${top10Pct.toFixed(1)}%</div></div>`;
+      html+='</div>';
+      html+=`<div class="tc"><div class="ct">Top 20 Clientes por Ventas</div>
+        <table><thead><tr style="background:#0f1923;color:#fff;">
+          <th style="text-align:left;">#</th><th style="text-align:left;">Cliente</th>
+          <th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th>
+          <th style="font-weight:800;">Total</th><th>% del Total</th>
+        </tr></thead><tbody>`;
+      clients.filter(c=>c.t>0).slice(0,20).forEach((cl,i)=>{
+        const pct=totalClVta>0?(cl.t/totalClVta*100):0;
+        html+=`<tr>
+          <td style="text-align:center;"><span class="rank">${i+1}</span></td>
+          <td style="font-weight:600;font-size:11px;">${cl.n}</td>
+          <td>${fmtV(cl.q1)}</td><td>${fmtV(cl.q2)}</td><td>${fmtV(cl.q3)}</td><td>${fmtV(cl.q4)}</td>
+          <td style="font-weight:700;">${fmtV(cl.t)}</td>
+          <td>${pct.toFixed(1)}%</td>
+        </tr>`;
+      });
+      html+='</tbody></table></div>';
+      if(top5Pct>50){
+        html+=`<div class="alr alr-y">Alta concentracion de clientes: los Top 5 representan el <b>${top5Pct.toFixed(1)}%</b> de las ventas. Se recomienda diversificar la cartera.</div>`;
+      }
+    }
+
+    return html;
+  }
+
+  function buildSeasonality(){
+    const gb=globalBrands();
+    // Quarterly totals by segment
+    const segs=['OTC','PC'];
+    let html='<div class="cg2">';
+    segs.forEach(seg=>{
+      const brands=gb.filter(b=>b.segment===seg);
+      const q=[brands.reduce((a,b)=>a+b.q1v,0),brands.reduce((a,b)=>a+b.q2v,0),brands.reduce((a,b)=>a+b.q3v,0),brands.reduce((a,b)=>a+b.q4v,0)];
+      const total=q.reduce((a,b)=>a+b,0);
+      html+=`<div class="cc"><div class="ct">Estacionalidad ${seg} — Ventas Trimestrales (MM MXN)</div>
+        <table style="font-size:11px;"><thead><tr><th></th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Total</th></tr></thead><tbody>
+        <tr><td style="font-weight:700;">2025</td>${q.map(v=>`<td>${fmtV(v)}</td>`).join('')}<td style="font-weight:800;">${fmtV(total)}</td></tr>
+        <tr style="background:#f8fafc;"><td style="font-weight:700;">% del Total</td>${q.map(v=>`<td style="color:#64748b;">${total>0?(v/total*100).toFixed(0)+'%':'—'}</td>`).join('')}<td>100%</td></tr>
+        </tbody></table></div>`;
+    });
+    html+='</div>';
+
+    // Country heatmap
+    html+=`<div class="tc"><div class="ct" style="font-size:14px;font-weight:800;">Heatmap — Distribucion Trimestral por Pais 2025</div>
+      <table style="font-size:10.5px;"><thead><tr style="background:#0f1923;color:#fff;">
+        <th style="text-align:left;">Pais</th><th>Q1 (MM)</th><th>Q2 (MM)</th><th>Q3 (MM)</th><th>Q4 (MM)</th><th>Total</th><th>Mg Bruto</th>
+      </tr></thead><tbody>`;
+    countries.forEach(co=>{
+      const brs=countryBrands(co);
+      if(!brs||brs.length===0)return;
+      const q1=brs.reduce((a,b)=>a+b.q1v,0),q2=brs.reduce((a,b)=>a+b.q2v,0),q3=brs.reduce((a,b)=>a+b.q3v,0),q4=brs.reduce((a,b)=>a+b.q4v,0);
+      const tv=brs.reduce((a,b)=>a+b.tv,0),tc=brs.reduce((a,b)=>a+b.tc,0);
+      const mgBr=tv>0?((tv-tc)/tv*100):0;
+      const maxQ=Math.max(q1,q2,q3,q4,1);
+      html+=`<tr>
+        <td style="font-weight:600;">${(CNAMES[co]||co).split('(')[0].trim()}</td>
+        <td style="background:${q1/maxQ>0.7?'#dcfce7':q1/maxQ>0.4?'#f0fdf4':'#f8fafc'};text-align:right;">${fmtV(q1)}</td>
+        <td style="background:${q2/maxQ>0.7?'#dcfce7':q2/maxQ>0.4?'#f0fdf4':'#f8fafc'};text-align:right;">${fmtV(q2)}</td>
+        <td style="background:${q3/maxQ>0.7?'#dcfce7':q3/maxQ>0.4?'#f0fdf4':'#f8fafc'};text-align:right;">${fmtV(q3)}</td>
+        <td style="background:${q4/maxQ>0.7?'#dcfce7':q4/maxQ>0.4?'#f0fdf4':'#f8fafc'};text-align:right;">${fmtV(q4)}</td>
+        <td style="font-weight:700;text-align:right;">${fmtV(tv)}</td>
+        <td style="text-align:right;color:${mgBr>=50?'#10b981':mgBr>=30?'#f59e0b':'#ef4444'};font-weight:700;">${mgBr.toFixed(1)}%</td>
+      </tr>`;
+    });
+    html+='</tbody></table></div>';
+    return html;
+  }
+
+  function buildStrategic(){
+    const gb=globalBrands();
+    const seg=globalSegTotals();
+    const totalVta=seg.totV||gb.reduce((a,b)=>a+b.tv,0);
+    let html='';
+
+    // Brand concentration
+    const top5Pct=totalVta>0?(gb.slice(0,5).reduce((a,b)=>a+b.tv,0)/totalVta*100):0;
+    const top10Pct=totalVta>0?(gb.slice(0,10).reduce((a,b)=>a+b.tv,0)/totalVta*100):0;
+    const mgGlobal=totalVta>0?((totalVta-seg.totC)/totalVta*100):0;
+    html+=`<div class="kpi-row">
+      <div class="kc" style="border-left:4px solid #8b5cf6;"><div class="klbl">CONCENTRACION TOP 5 MARCAS</div><div class="kval">${top5Pct.toFixed(1)}%</div></div>
+      <div class="kc" style="border-left:4px solid #3b82f6;"><div class="klbl">CONCENTRACION TOP 10</div><div class="kval">${top10Pct.toFixed(1)}%</div></div>
+      <div class="kc" style="border-left:4px solid #00843D;"><div class="klbl">MARGEN BRUTO GLOBAL</div><div class="kval">${mgGlobal.toFixed(1)}%</div></div>
+      <div class="kc" style="border-left:4px solid #f59e0b;"><div class="klbl">TOTAL MARCAS</div><div class="kval">${gb.filter(b=>b.tv>0.5).length}</div></div>
+    </div>`;
+
+    // Strategic report
+    html+='<div class="inv-report"><div class="inv-report-hdr"><div class="inv-logo">GL</div><div class="inv-hdr-txt"><h3>Analisis Estrategico de Ventas por Marca</h3><p>Insights y Recomendaciones — Portafolio 2025</p></div></div>';
+
+    // Stars (high total + good margin)
+    const stars=gb.filter(br=>br.tv>20&&(br.tv-br.tc)/br.tv>0.5).sort((a,b)=>b.tv-a.tv);
+    // At risk (negative margin or declining Q4 vs Q1)
+    const atRisk=gb.filter(br=>br.tv>2&&((br.tc>br.tv)||(br.q1v>0&&br.q4v<br.q1v*0.8)));
+    // Best margin
+    const bestMg=gb.filter(br=>br.tv>5).sort((a,b)=>((b.tv-b.tc)/b.tv)-((a.tv-a.tc)/a.tv)).slice(0,5);
+
+    html+='<div class="inv-section"><div class="inv-section-title">Marcas Estrella (Alto Volumen + Margen >50%)</div><div class="inv-text">';
+    if(stars.length>0){
+      stars.slice(0,6).forEach(br=>{
+        const mg=((br.tv-br.tc)/br.tv*100);
+        html+=`<p><strong>${br.brand}</strong> (${br.segment||'—'}): Ventas <span class="inv-num">${fmtV(br.tv)} MM</span>, Margen Bruto <span class="inv-up">${mg.toFixed(1)}%</span>. Presente en <span class="inv-num">${br.countries.length}</span> paises.</p>`;
+      });
+    } else {html+='<p>Analizar marcas principales del portafolio para oportunidades de optimizacion.</p>';}
+    html+='</div></div>';
+
+    html+='<div class="inv-section"><div class="inv-section-title">Top 5 Marcas por Margen Bruto</div><div class="inv-text">';
+    bestMg.forEach((br,i)=>{
+      const mg=((br.tv-br.tc)/br.tv*100);
+      html+=`<p><b>${i+1}. ${br.brand}</b>: Margen <span class="inv-up">${mg.toFixed(1)}%</span> — ${fmtV(br.tv)} MM en ventas.</p>`;
+    });
+    html+='</div></div>';
+
+    html+='<div class="inv-section"><div class="inv-section-title">Marcas que Requieren Atencion</div><div class="inv-text">';
+    if(atRisk.length>0){
+      atRisk.slice(0,5).forEach(br=>{
+        const mg=br.tv>0?((br.tv-br.tc)/br.tv*100):0;
+        html+=`<p><strong>${br.brand}</strong> (${br.segment||'—'}): <span class="inv-dn">Margen ${mg.toFixed(1)}%</span>. Revisar estructura de costos y estrategia de pricing. Ventas: ${fmtV(br.tv)} MM.</p>`;
+      });
+    } else {html+='<p>El portafolio en general muestra margenes saludables.</p>';}
+    html+='</div></div>';
+
+    html+=`<div class="inv-section"><div class="inv-section-title">Recomendaciones Estrategicas</div><div class="inv-text">
+      <p><strong>1. Concentracion de portafolio:</strong> Las Top 5 marcas concentran el <span class="inv-num">${top5Pct.toFixed(0)}%</span> de las ventas. Oportunidad de fortalecer marcas de rango medio.</p>
+      <p><strong>2. Expansion geografica:</strong> Identificar marcas exitosas en pocos paises y expandirlas. Mayor presencia geografica = mayor resiliencia.</p>
+      <p><strong>3. Optimizacion de margen:</strong> El margen bruto global es <span class="inv-num">${mgGlobal.toFixed(1)}%</span>. Las marcas con margen >60% merecen mayor inversion comercial.</p>
+      <p><strong>4. Mix OTC vs PC:</strong> OTC representa ${seg.totV>0?(seg.otcV/seg.totV*100).toFixed(0):'—'}% del portafolio. Evaluar balance optimo segun condiciones de cada mercado.</p>
+    </div></div>`;
+
+    html+='<div class="inv-disclaimer">Analisis generado a partir de datos de ventas por marca (fuente: ventas_2025_data.js). Cifras en MM MXN (raw / 1,000,000). Segmentacion: OTC / Personal Care. Periodo: 2025.</div></div>';
+    return html;
+  }
+
+  // Main render
+  let _vtView='overview';
+  let _vtCountry=countries[0]||'Colombia';
+
+  function render(){
+    let content='';
+    if(_vtView==='overview')content=buildOverview();
+    else if(_vtView==='country')content=buildCountryView(_vtCountry);
+    else if(_vtView==='seasonality')content=buildSeasonality();
+    else if(_vtView==='strategic')content=buildStrategic();
+
+    document.getElementById('main').innerHTML=`
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;">
+        <div class="pg-title">Ventas por Marca y Cliente</div>
+        <span style="background:var(--acc);color:#fff;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;">2025</span>
+      </div>
+      <div class="pg-sub">Datos de ventas_2025_data.js &middot; Valores en MM MXN &middot; Segmentacion OTC / Personal Care</div>
+      ${!hasNew?'<div class="alr alr-y"><b>Nota:</b> ventas_2025_data.js no encontrado. Verifica que el archivo exista en la misma carpeta.</div>':''}
+      <div class="vt-tabs">
+        <div class="vt-tab ${_vtView==='overview'?'act':''}" onclick="window._vtNav('overview')">Vista Global</div>
+        <div class="vt-tab ${_vtView==='country'?'act':''}" onclick="window._vtNav('country')">Por Pais</div>
+        <div class="vt-tab ${_vtView==='seasonality'?'act':''}" onclick="window._vtNav('seasonality')">Estacionalidad</div>
+        <div class="vt-tab ${_vtView==='strategic'?'act':''}" onclick="window._vtNav('strategic')">Analisis Estrategico</div>
+      </div>
+      ${_vtView==='country'?`<div class="vt-filter"><label style="font-size:11px;font-weight:700;color:var(--t3);">PAIS:</label><select id="vt-co-sel" onchange="window._vtSetCountry(this.value)">${countries.map(c=>`<option value="${c}" ${c===_vtCountry?'selected':''}>${CNAMES[c]||c}</option>`).join('')}</select></div>`:''}
+      <div id="vt-content">${content}</div>`;
+  }
+
+  window._vtNav=function(v){_vtView=v;render();};
+  window._vtSetCountry=function(c){_vtCountry=c;render();};
+  render();
+}
+
 // ═══════════════════ BENCHMARKING DATA & RENDER ═══════════════════
 const BENCH_DATA = {
   otc: [
@@ -529,7 +1029,7 @@ function renderBenchmark(){
     const companies=BENCH_DATA[cat];
     const allQtrs=new Set();
     companies.forEach(c=>Object.keys(c.quarters).forEach(q=>allQtrs.add(q)));
-    const quarters=[...allQtrs].sort().reverse().slice(0,4);
+    const quarters=[...allQtrs].sort().reverse().slice(0,8);
     let html='<table style="font-size:10.5px;width:100%;border-collapse:collapse;"><thead>'+
       '<tr style="background:#0f1923;color:#fff;"><th style="text-align:left;padding:10px 8px;border-radius:8px 0 0 0;">EMPRESA</th><th style="padding:10px 6px;">TICKER</th><th style="padding:10px 6px;">MONEDA</th><th style="padding:10px 6px;">MKT CAP</th>';
     quarters.forEach(q=>html+='<th colspan="4" style="text-align:center;padding:10px 4px;border-left:2px solid #1e2d40;">'+q+'</th>');
@@ -560,9 +1060,77 @@ function renderBenchmark(){
     return '<div class="kpi-row"><div class="kc" style="border-left:4px solid #00843D;"><div class="klbl">MARGEN EBITDA GL</div><div class="kval" style="color:#00843D;">'+lastQ.ebitdaMg.toFixed(1)+'%</div><div class="kch '+(lastQ.ebitdaMg>avgEbitda?'pos':'neg')+'">vs promedio '+avgEbitda.toFixed(1)+'%</div></div><div class="kc" style="border-left:4px solid #3b82f6;"><div class="klbl">MARGEN NETO GL</div><div class="kval" style="color:#3b82f6;">'+lastQ.netMg.toFixed(1)+'%</div><div class="kch '+(lastQ.netMg>avgNet?'pos':'neg')+'">vs promedio '+avgNet.toFixed(1)+'%</div></div><div class="kc" style="border-left:4px solid #f59e0b;"><div class="klbl">RANKING EBITDA</div><div class="kval">#'+ebitdaRank+'</div><div class="kch neu">de '+companies.filter(c=>{const q=Object.values(c.quarters)[0];return q&&q.ebitdaMg!==null;}).length+' empresas</div></div><div class="kc" style="border-left:4px solid #8b5cf6;"><div class="klbl">RANKING MARGEN NETO</div><div class="kval">#'+netRank+'</div><div class="kch neu">de '+companies.filter(c=>{const q=Object.values(c.quarters)[0];return q&&q.netMg!==null;}).length+' empresas</div></div></div>';
   }
 
+  function buildEvolution(cat){
+    const companies=BENCH_DATA[cat];
+    const gl=companies.find(c=>c.highlight);if(!gl)return'';
+    const qtrs=Object.keys(gl.quarters).sort();
+    if(qtrs.length<2)return'';
+    let html='<div class="cc" style="margin-bottom:18px;border-top:3px solid #00843D;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="background:linear-gradient(135deg,#00843D,#00b356);color:#fff;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.5px;">SERIE HISTORICA</span><div class="ct" style="font-size:15px;font-weight:800;margin:0;">Evolucion Historica Q1 2024 - Q4 2025</div></div><div style="font-size:10.5px;color:var(--t4);margin-bottom:12px;">Tendencias sostenidas, cambios estructurales y variaciones trimestrales a lo largo del periodo completo</div>';
+    // GL evolution table
+    html+='<table style="font-size:10.5px;width:100%;border-collapse:collapse;"><thead><tr style="background:#0f1923;color:#fff;"><th style="text-align:left;padding:8px;">Metrica</th>';
+    qtrs.forEach(q=>html+='<th style="padding:8px;text-align:center;">'+q+'</th>');
+    html+='<th style="padding:8px;text-align:center;">Tendencia</th></tr></thead><tbody>';
+    const metrics=[{k:'rev',l:'Revenue',isP:false},{k:'ebitdaMg',l:'Mg EBITDA',isP:true},{k:'opMg',l:'Mg Operativo',isP:true},{k:'netMg',l:'Mg Neto',isP:true},{k:'revGrowth',l:'Crec. Revenue YoY',isP:true}];
+    metrics.forEach(m=>{
+      const vals=qtrs.map(q=>gl.quarters[q]?gl.quarters[q][m.k]:null);
+      const validVals=vals.filter(v=>v!==null&&v!==undefined);
+      let trend='—';
+      if(validVals.length>=3){
+        const first=validVals[0],last=validVals[validVals.length-1];
+        const diff=last-first;
+        if(m.isP){trend=diff>2?'<span style="color:#10b981;font-weight:700;">Mejora (+'+diff.toFixed(1)+' pp)</span>':diff<-2?'<span style="color:#ef4444;font-weight:700;">Deterioro ('+diff.toFixed(1)+' pp)</span>':'<span style="color:#94a3b8;">Estable</span>';}
+        else{const pct=first>0?((last-first)/first*100):0;trend=pct>5?'<span style="color:#10b981;font-weight:700;">Crecimiento</span>':pct<-5?'<span style="color:#ef4444;font-weight:700;">Contraccion</span>':'<span style="color:#94a3b8;">Estable</span>';}
+      }
+      html+='<tr><td style="padding:6px 8px;font-weight:600;">'+m.l+'</td>';
+      vals.forEach(v=>{
+        const fVal=v!==null&&v!==undefined?(m.isP?v.toFixed(1)+'%':(v>=1000?(v/1000).toFixed(1)+'K':v.toLocaleString('en'))):'—';
+        const clr=m.isP&&v!==null?(v>=0?'color:#10b981':'color:#ef4444'):'';
+        html+='<td style="padding:6px 8px;text-align:center;'+clr+'">'+fVal+'</td>';
+      });
+      html+='<td style="padding:6px 8px;text-align:center;">'+trend+'</td></tr>';
+    });
+    html+='</tbody></table>';
+
+    // Compare GL vs top 3 peers evolution
+    const peers=companies.filter(c=>!c.highlight).filter(c=>Object.keys(c.quarters).length>=3).slice(0,3);
+    if(peers.length>0){
+      html+='<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:8px;">Comparativo de Tendencias — Mg EBITDA</div>';
+      html+='<table style="font-size:10.5px;width:100%;border-collapse:collapse;"><thead><tr style="background:#162030;color:#94a3b8;"><th style="text-align:left;padding:6px 8px;">Empresa</th>';
+      qtrs.forEach(q=>html+='<th style="padding:6px;text-align:center;">'+q+'</th>');
+      html+='</tr></thead><tbody>';
+      [gl,...peers].forEach(c=>{
+        const isGL=c.highlight;
+        html+='<tr style="'+(isGL?'background:#f0fdf4;font-weight:700;':'')+'"><td style="padding:6px 8px;color:'+(isGL?'#00843D':'var(--t2)')+';">'+(isGL?'Genomma Lab':c.name)+'</td>';
+        qtrs.forEach(q=>{
+          const d=c.quarters[q];
+          const v=d?d.ebitdaMg:null;
+          html+='<td style="padding:6px;text-align:center;'+(v!==null?(v>=0?'color:#10b981':'color:#ef4444'):'color:#94a3b8')+';">'+(v!==null?v.toFixed(1)+'%':'—')+'</td>';
+        });
+        html+='</tr>';
+      });
+      html+='</tbody></table></div>';
+    }
+
+    // Key insights from evolution
+    const firstQ=gl.quarters[qtrs[0]],lastQ=gl.quarters[qtrs[qtrs.length-1]];
+    if(firstQ&&lastQ){
+      const ebitdaChg=lastQ.ebitdaMg-firstQ.ebitdaMg;
+      const revChg=firstQ.rev>0?((lastQ.rev-firstQ.rev)/firstQ.rev*100):0;
+      html+=`<div style="margin-top:14px;padding:12px 16px;background:rgba(0,132,61,.04);border-radius:8px;border:1px solid rgba(0,132,61,.12);font-size:12px;line-height:1.7;color:var(--t2);">
+        <strong style="color:var(--acc);">Hallazgos Clave de la Evolucion:</strong><br>
+        <b>Revenue:</b> ${revChg>=0?'Crecimiento':'Contraccion'} del <b>${Math.abs(revChg).toFixed(1)}%</b> desde ${qtrs[0]} hasta ${qtrs[qtrs.length-1]}.<br>
+        <b>Margen EBITDA:</b> ${ebitdaChg>=0?'Mejora':'Deterioro'} de <b>${Math.abs(ebitdaChg).toFixed(1)} pp</b> (de ${firstQ.ebitdaMg.toFixed(1)}% a ${lastQ.ebitdaMg.toFixed(1)}%).<br>
+        <b>Margen Neto:</b> ${lastQ.netMg!==null&&firstQ.netMg!==null?(lastQ.netMg-firstQ.netMg>=0?'Mejora':'Deterioro')+' de <b>'+Math.abs(lastQ.netMg-firstQ.netMg).toFixed(1)+' pp</b>':'Datos parciales'}.<br>
+        <b>Consistencia:</b> ${Math.abs(ebitdaChg)<3?'Margenes estables a lo largo del periodo — senal de disciplina operativa.':'Variacion significativa — revisar factores estacionales y extraordinarios.'}
+      </div>`;
+    }
+    html+='</div>';
+    return html;
+  }
+
   document.getElementById('main').innerHTML=
   '<div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;"><div class="pg-title">Benchmarking Competitivo</div><span style="background:#00843D;color:#fff;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.5px;">GENOMMA LAB vs INDUSTRIA</span></div>'+
-  '<div class="pg-sub">Comparativo trimestral con principales competidores globales OTC y Personal Care &middot; Datos de reportes trimestrales oficiales</div>'+
+  '<div class="pg-sub">Comparativo trimestral completo Q1 2024 — Q4 2025 con principales competidores globales OTC y Personal Care &middot; Datos de reportes trimestrales oficiales</div>'+
   '<div style="display:flex;gap:8px;margin-bottom:20px;"><button id="bench-otc-btn" onclick="switchBench(\'otc\')" style="padding:11px 28px;border-radius:8px;border:2px solid var(--acc);background:var(--acc);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">OTC / Farmaceutica</button><button id="bench-pc-btn" onclick="switchBench(\'pc\')" style="padding:11px 28px;border-radius:8px;border:2px solid var(--brd);background:var(--card);color:var(--t2);font-weight:700;cursor:pointer;font-size:13px;">Personal Care</button></div>'+
   '<div id="bench-content"></div>';
 
@@ -582,6 +1150,7 @@ function renderBenchmark(){
     '<div class="tc" style="margin-bottom:20px;"><div class="ct" style="font-size:14px;font-weight:800;margin-bottom:12px;">Comparativo Trimestral Detallado &mdash; '+label+'</div><div style="overflow-x:auto;border-radius:10px;border:1px solid var(--brd);box-shadow:0 2px 8px rgba(0,0,0,.06);">'+buildTable(cat)+'</div></div>'+
     '<div class="cg2"><div class="cc" style="border-top:3px solid #10b981;"><div class="ct" style="font-size:13px;">Ranking Margen EBITDA</div><div style="font-size:10px;color:var(--t4);margin-bottom:10px;">Ultimo trimestre reportado</div>'+buildMarginChart(cat,'ebitdaMg')+'</div><div class="cc" style="border-top:3px solid #3b82f6;"><div class="ct" style="font-size:13px;">Ranking Margen Neto</div><div style="font-size:10px;color:var(--t4);margin-bottom:10px;">Ultimo trimestre reportado</div>'+buildMarginChart(cat,'netMg')+'</div></div>'+
     '<div class="cg2"><div class="cc" style="border-top:3px solid #f59e0b;"><div class="ct" style="font-size:13px;">Ranking Margen Operativo</div><div style="font-size:10px;color:var(--t4);margin-bottom:10px;">Ultimo trimestre reportado</div>'+buildMarginChart(cat,'opMg')+'</div><div class="cc" style="border-top:3px solid #8b5cf6;"><div class="ct" style="font-size:13px;">Crecimiento de Ingresos YoY</div><div style="font-size:10px;color:var(--t4);margin-bottom:10px;">Variacion % vs mismo trimestre del ano anterior</div>'+buildMarginChart(cat,'revGrowth')+'</div></div>'+
+    buildEvolution(cat)+
     '<div class="cc" style="margin-bottom:18px;border-top:3px solid #00843D;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><span style="background:#00843D;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;">EXECUTIVE INSIGHT</span><span style="font-size:13px;font-weight:800;color:var(--t1);">Posicionamiento Estrategico de Genomma Lab</span></div><div style="font-size:12.5px;line-height:1.8;color:var(--t2);">'+(isOtc?otcNarr:pcNarr)+'</div></div>'+
     '<div class="cc" style="background:linear-gradient(135deg,#f8fafc,#f0f4f8);border:1px solid var(--brd);"><div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;"><span style="font-size:11px;font-weight:700;color:var(--t1);text-transform:uppercase;letter-spacing:.5px;">Fuentes Oficiales</span></div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;">'+buildSourcesList(cat)+'</div><div style="font-size:9.5px;color:var(--t4);line-height:1.5;border-top:1px solid var(--brd);padding-top:8px;"><b>Nota metodologica:</b> Datos de reportes trimestrales/semestrales oficiales (SEC/EDGAR, BMV, B3, LSE, Euronext, XETRA, SIX). Margenes (%) directamente comparables entre monedas. Ingresos en moneda local. Cifras al ultimo reporte disponible (cierre fiscal 2025 o H2 2025). Companias privadas excluidas por falta de informacion publica verificable.</div></div>';
   };
@@ -609,6 +1178,7 @@ function setActive(view,co){
   if(view==='general')document.getElementById('btn-general').classList.add('act');
   else if(view==='consolidado')document.getElementById('btn-consolidado').classList.add('act');
   else if(view==='benchmark')document.getElementById('btn-benchmark').classList.add('act');
+  else if(view==='ventas')document.getElementById('btn-ventas').classList.add('act');
   else if(co)document.getElementById('ci-'+co)?.classList.add('act');
 }
 
@@ -620,11 +1190,150 @@ function nav(view,co=null){
   if(view==='general')renderGeneral();
   else if(view==='consolidado')renderConsolidado();
   else if(view==='benchmark')renderBenchmark();
+  else if(view==='ventas')renderVentas();
   else if(view==='country')renderCountry(co);
   document.getElementById('main').scrollTop=0;
 }
 
 // ═══════════════════ RENDER GENERAL ═══════════════════
+// ═══════════════════ SVG WORLD MAP ═══════════════════
+function buildWorldMapHTML(){
+  const salesData={};
+  let totalSales=0;
+  ACTIVE.forEach(co=>{const v=RAW.annual['2025'][co]?RAW.annual['2025'][co].v||0:0;salesData[co]=v;totalSales+=v;});
+
+  function getPct(co){return totalSales>0?((salesData[co]||0)/totalSales):0;}
+  function getColor(pct){
+    if(pct===0)return'#e2e8f0';
+    if(pct<0.02)return'#dcfce7';
+    if(pct<0.05)return'#86efac';
+    if(pct<0.10)return'#4ade80';
+    if(pct<0.20)return'#22c55e';
+    if(pct<0.30)return'#16a34a';
+    return'#00843D';
+  }
+
+  // Accurate country paths (Natural Earth derived, simplified for web)
+  // ViewBox: Americas 0-520, Atlantic gap, Europe/Spain inset at 580+
+  const shapes={
+    'USA':{path:'M28,38L32,32L60,28L100,25L140,22L175,24L210,30L240,35L265,38L280,48L275,60L268,72L260,80L248,88L232,95L218,98L205,95L190,98L178,102L168,98L155,95L140,100L128,105L118,100L108,92L95,88L82,85L72,82L60,78L48,72L38,65L30,55L28,45Z',label:[155,62]},
+    'Mexico':{path:'M58,95L72,88L85,90L98,92L108,96L118,102L128,108L140,108L150,115L155,125L148,135L140,142L130,150L122,155L115,148L105,142L100,135L95,128L88,120L82,112L75,105L65,100Z',label:[112,120]},
+    'Guatemala':{path:'M118,155L128,152L135,155L138,162L132,168L125,168L118,165Z',label:[128,162]},
+    'Costa Rica':{path:'M128,175L135,172L140,175L142,182L138,188L132,188L128,182Z',label:[135,182]},
+    'Panama':{path:'M140,185L148,182L158,185L162,190L155,195L148,195L142,192Z',label:[150,190]},
+    'Rep. Dom.':{path:'M218,148L228,145L235,148L235,155L228,158L220,158L215,152Z',label:[226,153]},
+    'Colombia':{path:'M145,208L158,200L172,202L182,210L185,222L180,235L170,242L158,240L148,232L142,220Z',label:[163,222]},
+    'Ecuador':{path:'M128,240L140,235L150,238L152,248L145,258L135,258L128,252Z',label:[140,248]},
+    'Peru':{path:'M135,258L150,255L162,260L172,270L175,285L172,300L165,312L155,318L142,315L132,305L128,292L128,278L130,268Z',label:[152,288]},
+    'Bolivia':{path:'M172,295L185,290L198,295L202,310L195,325L182,328L172,322L168,310Z',label:[185,312]},
+    'Brasil':{path:'M188,218L202,212L218,215L238,222L255,235L268,252L275,272L275,295L268,318L258,335L245,348L228,355L212,352L198,342L188,328L178,315L175,300L178,280L182,262L185,242Z',label:[228,278]},
+    'Paraguay':{path:'M195,328L208,325L218,332L218,345L210,352L198,350L192,342Z',label:[206,340]},
+    'Chile':{path:'M155,318L165,315L170,325L172,340L170,358L168,378L165,398L162,418L158,432L152,442L148,435L148,418L150,398L152,378L152,358L152,338L153,328Z',label:[145,385]},
+    'Argentina':{path:'M168,340L182,335L195,342L205,355L210,372L208,392L202,412L195,428L185,438L175,442L165,435L158,420L158,402L160,385L162,368L165,355Z',label:[185,390]},
+    'Uruguay':{path:'M202,348L212,345L218,352L218,362L212,368L202,365L198,358Z',label:[208,358]},
+    'Espana':{path:'M588,82L608,78L628,80L640,88L642,100L635,110L622,115L608,112L595,108L585,100L585,90Z',label:[613,98]}
+  };
+
+  // Build sorted ranking for bar chart
+  const ranked=[...ACTIVE].map(co=>({co,v:salesData[co]||0,pct:getPct(co)})).sort((a,b)=>b.v-a.v);
+
+  let svgPaths='';
+  ACTIVE.forEach(co=>{
+    const sh=shapes[co];if(!sh)return;
+    const pct=getPct(co);const color=getColor(pct);
+    const v=salesData[co]||0;const pctStr=(pct*100).toFixed(1);
+    svgPaths+=`<path d="${sh.path}" fill="${color}" stroke="#fff" stroke-width="1"
+      style="cursor:pointer;transition:all .25s ease;filter:drop-shadow(0 1px 2px rgba(0,0,0,.12));"
+      onmouseover="this.style.filter='drop-shadow(0 3px 8px rgba(0,0,0,.3))brightness(1.08)';document.getElementById('wm-tip').innerHTML='<div style=\\'font-weight:700;font-size:13px;margin-bottom:4px;\\'>${CNAMES[co]||co}</div><div style=\\'font-size:20px;font-weight:800;color:#4ade80;\\'>${fmt(v,1)} MM</div><div style=\\'font-size:11px;color:#94a3b8;margin-top:2px;\\'>${pctStr}% de ventas totales</div>';document.getElementById('wm-tip').style.display='block';"
+      onmouseout="this.style.filter='drop-shadow(0 1px 2px rgba(0,0,0,.12))';document.getElementById('wm-tip').style.display='none';"
+      onclick="nav('country','${co}')">
+      <title>${CNAMES[co]||co}: ${fmt(v,1)} MM MXN (${pctStr}%)</title>
+    </path>`;
+    // Percentage label
+    if(sh.label && pct>0){
+      svgPaths+=`<text x="${sh.label[0]}" y="${sh.label[1]}" text-anchor="middle" font-size="8" font-weight="700" fill="#1e293b" pointer-events="none" style="font-family:'Inter',system-ui,sans-serif;text-shadow:0 0 3px rgba(255,255,255,.9);">${(pct*100).toFixed(0)}%</text>`;
+    }
+  });
+
+  // Connection line Americas ~~~ Spain
+  const spanLine='<line x1="520" y1="200" x2="575" y2="100" stroke="#94a3b8" stroke-width="0.8" stroke-dasharray="4,3" opacity="0.5"/>';
+
+  // Build horizontal bar ranking
+  const top10=ranked.slice(0,10);
+  const maxV=top10[0]?top10[0].v:1;
+  const barRows=top10.map((r,i)=>{
+    const w=Math.max(2,r.v/maxV*100);
+    const bgCol=getColor(r.pct);
+    return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+      <div style="width:80px;font-size:11px;font-weight:600;color:var(--t2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${CNAMES[r.co]}">${CNAMES[r.co]}</div>
+      <div style="flex:1;height:22px;background:#f1f5f9;border-radius:4px;overflow:hidden;position:relative;">
+        <div style="width:${w}%;height:100%;background:${bgCol};border-radius:4px;transition:width .5s ease;"></div>
+        <span style="position:absolute;right:6px;top:3px;font-size:10px;font-weight:700;color:var(--t1);">${fmt(r.v,1)} MM</span>
+      </div>
+      <div style="width:42px;font-size:10.5px;font-weight:700;color:var(--t3);text-align:right;">${(r.pct*100).toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+
+  // Legend
+  const legendItems=[
+    {color:'#dcfce7',label:'<2%'},
+    {color:'#86efac',label:'2-5%'},
+    {color:'#4ade80',label:'5-10%'},
+    {color:'#22c55e',label:'10-20%'},
+    {color:'#16a34a',label:'20-30%'},
+    {color:'#00843D',label:'>30%'}
+  ];
+  const legendHTML=legendItems.map(l=>`<div style="display:flex;align-items:center;gap:4px;"><div style="width:14px;height:14px;border-radius:3px;background:${l.color};border:1px solid #e2e8f0;"></div><span style="font-size:10px;color:#64748b;">${l.label}</span></div>`).join('');
+
+  return `<div class="cc" style="margin-bottom:20px;position:relative;">
+    <div class="ct" style="display:flex;align-items:center;gap:10px;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" stroke="#00843D" stroke-width="1.5"/><ellipse cx="12" cy="12" rx="5" ry="11" stroke="#00843D" stroke-width="1"/><line x1="1" y1="8" x2="23" y2="8" stroke="#00843D" stroke-width="0.8"/><line x1="1" y1="16" x2="23" y2="16" stroke="#00843D" stroke-width="0.8"/></svg>
+      Mapa de Presencia Global — Participacion en Ventas 2025
+    </div>
+    <div style="font-size:11px;color:var(--t4);margin-bottom:12px;">Haz clic en un pais para ver su detalle. La intensidad del color representa la participacion en ventas totales.</div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;">
+      <!-- Map Column -->
+      <div style="flex:1.5;min-width:380px;position:relative;">
+        <div id="wm-tip" style="display:none;position:absolute;top:8px;right:8px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:12px 16px;border-radius:10px;font-size:12px;line-height:1.5;z-index:10;min-width:170px;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.08);"></div>
+        <svg viewBox="0 0 700 470" style="width:100%;border-radius:10px;background:linear-gradient(180deg,#f0f9ff 0%,#e0f2fe 50%,#dbeafe 100%);box-shadow:inset 0 0 30px rgba(148,163,184,.15);">
+          <!-- Subtle grid -->
+          <defs>
+            <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse"><path d="M 50 0 L 0 0 0 50" fill="none" stroke="#cbd5e1" stroke-width="0.2" opacity="0.4"/></pattern>
+            <linearGradient id="oceanGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#e0f2fe"/><stop offset="100%" style="stop-color:#bfdbfe"/></linearGradient>
+          </defs>
+          <rect width="700" height="470" fill="url(#oceanGrad)" rx="10"/>
+          <rect width="700" height="470" fill="url(#grid)" rx="10"/>
+          <!-- Water decoration -->
+          <text x="350" y="465" text-anchor="middle" font-size="9" fill="#94a3b8" font-family="system-ui,sans-serif" opacity="0.5">Genomma Lab Internacional — Presencia en 16 paises</text>
+          <!-- Connection line to Spain -->
+          ${spanLine}
+          <!-- Country shapes -->
+          ${svgPaths}
+          <!-- Region labels -->
+          <text x="200" y="18" text-anchor="middle" font-size="8" fill="#64748b" font-family="system-ui" letter-spacing="2" opacity="0.6">NORTEAMERICA</text>
+          <text x="135" y="200" text-anchor="middle" font-size="7" fill="#64748b" font-family="system-ui" letter-spacing="1.5" opacity="0.6">CENTROAMERICA</text>
+          <text x="185" y="460" text-anchor="middle" font-size="8" fill="#64748b" font-family="system-ui" letter-spacing="2" opacity="0.6">SUDAMERICA</text>
+          <text x="613" y="72" text-anchor="middle" font-size="7" fill="#64748b" font-family="system-ui" letter-spacing="1.5" opacity="0.6">EUROPA</text>
+        </svg>
+        <!-- Legend below map -->
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:8px;padding:6px 12px;background:var(--bg2);border-radius:6px;">
+          ${legendHTML}
+        </div>
+      </div>
+      <!-- Ranking Column -->
+      <div style="flex:1;min-width:280px;">
+        <div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Ranking por Ventas</div>
+        ${barRows}
+        <div style="margin-top:12px;padding:10px;background:linear-gradient(135deg,#00843D,#059669);border-radius:8px;color:#fff;">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:0.8;">Total Consolidado 2025</div>
+          <div style="font-size:22px;font-weight:800;margin-top:2px;">${fmt(totalSales,1)} MM MXN</div>
+          <div style="font-size:10px;opacity:0.7;margin-top:2px;">${ACTIVE.length} paises activos</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderGeneral(){
   // Build ranking sorted by ventas 2025
   const sorted=[...ACTIVE].sort((a,b)=>RAW.annual['2025'][b].v-RAW.annual['2025'][a].v);
@@ -689,6 +1398,8 @@ function renderGeneral(){
       <tbody>${tbody}</tbody>
     </table>
   </div>
+
+  ${buildWorldMapHTML()}
 
   <div class="src">
     <b>📋 Fuente de datos y verificación</b><br><br>
@@ -1463,18 +2174,54 @@ renderGeneral();
 
 // ═══════════════════ FINANCIAL CHAT ENGINE ═══════════════════
 (function(){
-  // Inject chat HTML
+  // Inject chat HTML with robot icon
   document.body.insertAdjacentHTML('beforeend',`
-    <button id="chat-toggle" onclick="toggleChat()">💬<span class="badge">1</span></button>
+    <button id="chat-toggle" onclick="toggleChat()" title="Genomma AI Assistant">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Robot head -->
+        <rect x="6" y="10" width="20" height="14" rx="3" fill="#fff" opacity="0.95"/>
+        <!-- Robot eyes -->
+        <circle cx="11.5" cy="16" r="2.5" fill="#00843D"/>
+        <circle cx="20.5" cy="16" r="2.5" fill="#00843D"/>
+        <circle cx="12" cy="15.5" r="1" fill="#fff"/>
+        <circle cx="21" cy="15.5" r="1" fill="#fff"/>
+        <!-- Robot mouth -->
+        <rect x="10" y="20" width="12" height="2" rx="1" fill="#00843D" opacity="0.7"/>
+        <!-- Antenna -->
+        <line x1="16" y1="10" x2="16" y2="6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="16" cy="5" r="1.5" fill="#34d399"/>
+        <!-- GL text -->
+        <text x="16" y="18.5" text-anchor="middle" font-size="4.5" font-weight="900" fill="#0f1923" font-family="Arial,sans-serif">GL</text>
+      </svg>
+      <span class="badge">1</span>
+    </button>
     <div id="chat-panel">
       <div id="chat-hdr">
-        <div class="ch-logo">GL</div>
-        <div class="ch-info"><h4>Asistente Financiero</h4><p>Genomma Lab · Datos 2023–2025</p></div>
+        <div class="ch-logo" style="background:transparent;padding:0;width:44px;height:44px;">
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="44" height="44" rx="10" fill="#00843D"/>
+            <!-- Robot head -->
+            <rect x="8" y="14" width="28" height="18" rx="4" fill="#fff" opacity="0.95"/>
+            <!-- Robot eyes -->
+            <circle cx="16" cy="21" r="3.5" fill="#00843D"/>
+            <circle cx="28" cy="21" r="3.5" fill="#00843D"/>
+            <circle cx="17" cy="20" r="1.5" fill="#fff"/>
+            <circle cx="29" cy="20" r="1.5" fill="#fff"/>
+            <!-- Robot mouth -->
+            <rect x="14" y="26" width="16" height="2.5" rx="1.2" fill="#00843D" opacity="0.6"/>
+            <!-- Antenna -->
+            <line x1="22" y1="14" x2="22" y2="9" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="22" cy="7.5" r="2.5" fill="#34d399"/>
+            <!-- GL text -->
+            <text x="22" y="23.5" text-anchor="middle" font-size="6.5" font-weight="900" fill="#0f1923" font-family="Arial,sans-serif">GL</text>
+          </svg>
+        </div>
+        <div class="ch-info"><h4>Genomma AI Assistant</h4><p>Pregunta sobre ventas, marcas, paises y mas</p></div>
         <button id="chat-close" onclick="toggleChat()">&times;</button>
       </div>
       <div id="chat-msgs" id="chat-msgs"></div>
       <div id="chat-input-row">
-        <input id="chat-input" placeholder="Pregunta sobre los datos financieros..." onkeydown="if(event.key==='Enter')sendChat()">
+        <input id="chat-input" placeholder="Pregunta sobre marcas, ventas, benchmarking..." onkeydown="if(event.key==='Enter')sendChat()">
         <button id="chat-send" onclick="sendChat()">▶</button>
       </div>
     </div>
@@ -1482,14 +2229,14 @@ renderGeneral();
 
   // Welcome message
   setTimeout(()=>{
-    addBot(`¡Hola! Soy el <strong>asistente financiero</strong> de Genomma Lab. Puedo responder preguntas sobre los datos del dashboard 2023–2025.<br><br>Puedes preguntarme cosas como:
+    addBot(`¡Hola! Soy <strong>Genomma AI</strong>, tu asistente inteligente del dashboard financiero. Tengo acceso a todos los datos de ventas, marcas, clientes, benchmarking y financieros 2023-2025.<br><br>
     <div class="ch-suggest">
+      <button onclick="askQ(this)">Top 10 marcas 2025</button>
       <button onclick="askQ(this)">¿Cuánto vendió México en 2025?</button>
+      <button onclick="askQ(this)">Segmento OTC global</button>
       <button onclick="askQ(this)">¿Qué país creció más?</button>
-      <button onclick="askQ(this)">Margen EBITDA de Brasil</button>
-      <button onclick="askQ(this)">Compara Chile vs Colombia</button>
-      <button onclick="askQ(this)">¿Cómo le fue a Argentina en Q3?</button>
-      <button onclick="askQ(this)">Top 5 países por ventas</button>
+      <button onclick="askQ(this)">Compara Brasil vs Colombia</button>
+      <button onclick="askQ(this)">Competidores OTC</button>
     </div>`);
   },300);
 })();
@@ -1603,21 +2350,21 @@ function processQuery(q){
 
   // ── GREETINGS ──
   if(ql.match(/^(hola|hi|hello|hey|buenas?|buenos? d[ií]as?|buenas? tardes?|buenas? noches?|qué tal|que tal|saludos|qué onda|que onda|sup|cómo estás|como estas)\b/)){
-    const greets=['Hola! Soy el asistente financiero de Genomma Lab. Puedo ayudarte con:','Buenos dias! Estoy listo para responder tus preguntas financieras:','Hola! Preguntame lo que necesites sobre los financieros de Genomma Lab:'];
+    const greets=['Hola! Soy Genomma AI. Tengo acceso a todos los datos del dashboard. Puedo ayudarte con:','Buenos dias! Listo para responder tus preguntas sobre ventas, marcas y financieros:','Hola! Soy tu asistente de Genomma Lab. Preguntame lo que necesites:'];
     addBot(`<strong>${greets[Math.floor(Math.random()*greets.length)]}</strong>
       <div style="margin:8px 0;font-size:11.5px;line-height:1.7;color:#334155;">
-        <b>Datos por pais:</b> "Como le fue a Mexico?" / "Ventas de Brasil"<br>
+        <b>Paises:</b> "Como le fue a Mexico?" / "Ventas de Brasil"<br>
+        <b>Marcas:</b> "Top 10 marcas 2025" / "Segmento OTC" / "Marcas de Colombia"<br>
+        <b>Clientes:</b> "Clientes de Peru" / "Concentracion de clientes"<br>
         <b>Comparaciones:</b> "Compara Chile vs Colombia" / "Compara con Pfizer"<br>
         <b>Rankings:</b> "Top 5 por EBITDA" / "Quien crecio mas?"<br>
         <b>Trimestrales:</b> "Q3 de Peru" / "Ventas trimestrales de Argentina"<br>
-        <b>Tendencias:</b> "Tendencia de Mexico" / "Evolucion de ventas"<br>
         <b>Benchmark:</b> "Competidores OTC" / "Como se compara con JNJ?"<br>
-        <b>Educativo:</b> "Que es EBITDA?" / "Que es margen bruto?"<br>
-        <b>Mensuales:</b> "Ventas mensuales de Mexico"
+        <b>Educativo:</b> "Que es EBITDA?" / "Que es margen bruto?"
       </div>
       <div class="ch-suggest">
+        <button onclick="askQ(this)">Top 10 marcas 2025</button>
         <button onclick="askQ(this)">Resumen consolidado 2025</button>
-        <button onclick="askQ(this)">Top 5 por ventas</button>
         <button onclick="askQ(this)">Competidores OTC</button>
       </div>`);
     return;
@@ -1674,6 +2421,204 @@ function processQuery(q){
     for(const tk of tKeys){
       if(ql.includes(tk)){addBot(terms[tk]);return;}
     }
+  }
+
+  // ── VENTAS POR MARCA queries (supports both VENTAS_MARCA and legacy VENTAS) ──
+  const hasNewVD=(typeof VENTAS_MARCA!=='undefined');
+  const hasOldVD=(typeof VENTAS!=='undefined');
+  if((hasNewVD||hasOldVD)&&ql.match(/marca|brand|portafolio|otc\b|personal care|\bpc\b|segmento|cliente|top marca|cicatricure|tio nacho|asepxia|medicasp|shot b|next\b|genoprazol|teatrical|goicoechea|suerox|tukol|silka|lomecan|nikzon|vanart|groomen|ventas por marca|ventas por cliente|concentraci[oó]n|concentracion|mix de marca|brand mix/)){
+    const fmtVc=v=>v!==null&&!isNaN(v)?v.toLocaleString('es-MX',{minimumFractionDigits:1,maximumFractionDigits:1})+' MM':'—';
+    const co5=detectCountry(q);
+
+    if(hasNewVD){
+      // New data structure: VENTAS_MARCA[co] = [{b,s,q1v,q1c,q2v,q2c,q3v,q3c,q4v,q4c,tv,tc}]
+      const VM=VENTAS_MARCA;const VC=VENTAS_CLIENTE;const VS=VENTAS_SEGMENTO;
+      const M=1000000;
+      const vCountries=Object.keys(VM).filter(c=>ACTIVE.includes(c));
+
+      // Build global brand aggregation
+      const buildGlobalMap=()=>{
+        const map={};
+        vCountries.forEach(co=>{
+          (VM[co]||[]).forEach(br=>{
+            const k=(br.b||'').toUpperCase().trim();if(!k)return;
+            if(!map[k])map[k]={brand:br.b,seg:br.s||'',tv:0,tc:0,q1v:0,q2v:0,q3v:0,q4v:0,countries:[]};
+            map[k].tv+=(br.tv||0)/M; map[k].tc+=(br.tc||0)/M;
+            map[k].q1v+=(br.q1v||0)/M; map[k].q2v+=(br.q2v||0)/M;
+            map[k].q3v+=(br.q3v||0)/M; map[k].q4v+=(br.q4v||0)/M;
+            if(!map[k].countries.includes(co))map[k].countries.push(co);
+          });
+        });
+        return Object.values(map).sort((a,b)=>b.tv-a.tv);
+      };
+
+      // Client concentration
+      if(ql.match(/cliente|concentraci|client/)&&co5){
+        const clients=(VC[co5]||[]).map(cl=>({n:cl.n,t:(cl.t||0)/M,q1:(cl.q1||0)/M,q2:(cl.q2||0)/M,q3:(cl.q3||0)/M,q4:(cl.q4||0)/M})).sort((a,b)=>b.t-a.t);
+        if(clients.length>0){
+          const total=clients.filter(c=>c.t>0).reduce((a,b)=>a+b.t,0);
+          const top5pct=total>0?(clients.slice(0,5).reduce((a,b)=>a+Math.max(b.t,0),0)/total*100):0;
+          let tbl=`<table class="ch-tbl"><tr><th>#</th><th>Cliente</th><th>Total</th><th>%</th></tr>`;
+          clients.filter(c=>c.t>0).slice(0,10).forEach((c,i)=>{
+            tbl+=`<tr><td>${i+1}</td><td style="font-size:10.5px;">${c.n}</td><td>${fmtVc(c.t)}</td><td>${(c.t/total*100).toFixed(1)}%</td></tr>`;
+          });
+          tbl+='</table>';
+          addBot(`<strong>${CNAMES[co5]||co5} — Top 10 Clientes 2025:</strong>
+            <div style="font-size:11px;margin:4px 0;">Concentracion Top 5: <b>${top5pct.toFixed(1)}%</b> | Total: <b>${clients.length}</b></div>${tbl}`);
+          return;
+        }
+      }
+
+      // Segment analysis
+      if(ql.match(/otc\b|segmento|personal care|\bpc\b/)){
+        const isPC=ql.match(/personal care|\bpc\b|cuidado personal/);
+        const seg=isPC?'PC':'OTC';
+        const gb=buildGlobalMap();
+        const segBrands=gb.filter(b=>b.seg===seg);
+        const segTotal=segBrands.reduce((a,b)=>a+b.tv,0);
+        const top8=segBrands.slice(0,8);
+        let tbl=`<table class="ch-tbl"><tr><th>#</th><th>Marca</th><th>Ventas 2025</th><th>Mg Bruto</th><th>Paises</th></tr>`;
+        top8.forEach((b,i)=>{
+          const mg=b.tv>0?((b.tv-b.tc)/b.tv*100):0;
+          tbl+=`<tr><td>${i+1}</td><td><b>${b.brand}</b></td><td>${fmtVc(b.tv)}</td><td style="color:${mg>50?'#10b981':'#f59e0b'}">${mg.toFixed(1)}%</td><td>${b.countries.length}</td></tr>`;
+        });
+        tbl+='</table>';
+        addBot(`<strong>Segmento ${seg} — Top Marcas 2025:</strong>
+          <div style="font-size:11px;margin:4px 0;">Total ${seg}: <b>${fmtVc(segTotal)}</b> | ${segBrands.length} marcas activas</div>${tbl}
+          <div class="ch-suggest"><button onclick="askQ(this)">Top 10 marcas 2025</button><button onclick="askQ(this)">Ventas por marca de Colombia</button></div>`);
+        return;
+      }
+
+      // Brand in specific country
+      if(co5){
+        const coBrands=(VM[co5]||[]).map(br=>({b:br.b,s:br.s||'',tv:(br.tv||0)/M,tc:(br.tc||0)/M})).sort((a,b)=>b.tv-a.tv).slice(0,10);
+        if(coBrands.length>0){
+          const totalV=coBrands.reduce((a,b)=>a+b.tv,0);
+          let tbl=`<table class="ch-tbl"><tr><th>#</th><th>Marca</th><th>Seg.</th><th>Ventas</th><th>Mg Bruto</th></tr>`;
+          coBrands.forEach((b,i)=>{
+            const mg=b.tv>0?((b.tv-b.tc)/b.tv*100):0;
+            tbl+=`<tr><td>${i+1}</td><td><b>${b.b}</b></td><td>${b.s}</td><td>${fmtVc(b.tv)}</td><td style="color:${mg>50?'#10b981':'#f59e0b'}">${mg.toFixed(1)}%</td></tr>`;
+          });
+          tbl+='</table>';
+          addBot(`<strong>${CNAMES[co5]||co5} — Top 10 Marcas 2025:</strong>
+            <div style="font-size:11px;margin:4px 0;">Total ventas: <b>${fmtVc(totalV)}</b></div>${tbl}
+            <div class="ch-suggest"><button onclick="askQ(this)">Clientes de ${(CNAMES[co5]||co5).split(' ')[0]}</button></div>`);
+          return;
+        }
+      }
+
+      // Top 10 global brands
+      const gb=buildGlobalMap();
+      const top10=gb.slice(0,10);
+      let tbl=`<table class="ch-tbl"><tr><th>#</th><th>Marca</th><th>Seg.</th><th>Ventas 2025</th><th>Mg Bruto</th><th>Paises</th></tr>`;
+      top10.forEach((b,i)=>{
+        const mg=b.tv>0?((b.tv-b.tc)/b.tv*100):0;
+        tbl+=`<tr><td>${i+1}</td><td><b>${b.brand}</b></td><td>${b.seg}</td><td>${fmtVc(b.tv)}</td><td style="color:${mg>50?'#10b981':'#f59e0b'}">${mg.toFixed(1)}%</td><td>${b.countries.length}</td></tr>`;
+      });
+      tbl+='</table>';
+      addBot(`<strong>Top 10 Marcas Globales 2025 (MM MXN):</strong>${tbl}
+        <div class="ch-suggest"><button onclick="askQ(this)">Segmento OTC</button><button onclick="askQ(this)">Segmento Personal Care</button><button onclick="askQ(this)">Clientes de Colombia</button></div>`);
+      return;
+
+    } else if(hasOldVD){
+      // Legacy VENTAS data fallback
+      const VD=VENTAS;const vCountries=Object.keys(VD).filter(c=>ACTIVE.includes(c));
+      const varPc=(a,b)=>a&&Math.abs(a)>0.001?((b-a)/Math.abs(a)*100):null;
+
+      if(ql.match(/cliente|concentraci|client/)&&co5){
+        const d=VD[co5]&&(VD[co5]['2025']||VD[co5]['2024']);
+        if(d&&d.cl&&d.cl.length>0){
+          const sorted=d.cl.sort((a,b)=>b.t-a.t);
+          const total=sorted.filter(c=>c.t>0).reduce((a,b)=>a+b.t,0);
+          const top5pct=total>0?(sorted.slice(0,5).reduce((a,b)=>a+Math.max(b.t,0),0)/total*100):0;
+          let tbl=`<table class="ch-tbl"><tr><th>#</th><th>Cliente</th><th>Ventas</th><th>%</th></tr>`;
+          sorted.filter(c=>c.t>0).slice(0,10).forEach((c,i)=>{tbl+=`<tr><td>${i+1}</td><td>${c.n}</td><td>${fmtVc(c.t)}</td><td>${(c.t/total*100).toFixed(1)}%</td></tr>`;});
+          tbl+='</table>';
+          addBot(`<strong>${CNAMES[co5]||co5} — Top 10 Clientes:</strong><div style="font-size:11px;margin:4px 0;">Top 5: <b>${top5pct.toFixed(1)}%</b></div>${tbl}`);
+          return;
+        }
+      }
+
+      const mapB={};
+      vCountries.forEach(co=>{const d=VD[co]&&VD[co]['2025'];if(!d)return;d.b.forEach(br=>{const k=br.b.toUpperCase();if(!mapB[k])mapB[k]={brand:br.b,seg:br.s,t:0,countries:0};mapB[k].t+=br.t;mapB[k].countries++;});});
+      const top=Object.values(mapB).sort((a,b)=>b.t-a.t).slice(0,10);
+      let tbl=`<table class="ch-tbl"><tr><th>#</th><th>Marca</th><th>Seg.</th><th>Ventas 2025</th><th>Paises</th></tr>`;
+      top.forEach((b,i)=>{tbl+=`<tr><td>${i+1}</td><td><b>${b.brand}</b></td><td>${b.seg}</td><td>${fmtVc(b.t)}</td><td>${b.countries}</td></tr>`;});
+      tbl+='</table>';
+      addBot(`<strong>Top 10 Marcas Globales 2025:</strong>${tbl}
+        <div class="ch-suggest"><button onclick="askQ(this)">Segmento OTC</button><button onclick="askQ(this)">Segmento Personal Care</button></div>`);
+      return;
+    }
+  }
+
+  // ── DASHBOARD EXPLANATION queries ──
+  if(ql.match(/explica|explicame|explicar|qu[eé] muestra|qu[eé] significa|interpretar?|interpretar|analizar?|analiza|c[oó]mo leer|como se lee|qu[eé] indica|qu[eé] quiere decir|entender|dashboard|tablero|pantalla|secci[oó]n|m[oó]dulo|vista/)){
+    if(ql.match(/general|vista general|primera/)){
+      addBot(`<strong>Vista General del Dashboard:</strong>
+        <div style="font-size:11.5px;line-height:1.7;margin-top:6px;">
+        <p>La <b>Vista General</b> es el resumen ejecutivo principal. Muestra:</p>
+        <ul style="margin:4px 0 4px 16px;">
+          <li><b>Barra de KPIs:</b> Ventas consolidadas, variacion vs 2024, EBITDA, margen y utilidad neta</li>
+          <li><b>Top 8 Paises:</b> Grafico de barras con los mercados mas grandes por ventas</li>
+          <li><b>Tabla de ranking:</b> Todos los paises con ventas, EBITDA, margen y semaforo de alerta</li>
+          <li><b>Semaforo:</b> Verde=desempeno normal, Amarillo=atencion, Rojo=foco rojo (basado en desviacion de tendencia)</li>
+        </ul></div>`);
+      return;
+    }
+    if(ql.match(/benchmark|comparativo|competencia/)){
+      addBot(`<strong>Modulo de Benchmarking:</strong>
+        <div style="font-size:11.5px;line-height:1.7;margin-top:6px;">
+        <p>Compara a Genomma Lab contra <b>12+ empresas publicas</b> del sector OTC y Personal Care. Incluye:</p>
+        <ul style="margin:4px 0 4px 16px;">
+          <li><b>Tabla trimestral:</b> Revenue, EBITDA%, margen operativo y neto de Q1 2024 a Q4 2025</li>
+          <li><b>Rankings:</b> Posicion de GL en margenes vs competidores</li>
+          <li><b>Evolucion historica:</b> Tendencias desde Q1 2024 para identificar mejoras o deterioros</li>
+          <li><b>Insight ejecutivo:</b> Analisis narrativo del posicionamiento estrategico</li>
+        </ul></div>`);
+      return;
+    }
+    if(ql.match(/venta|marca|brand|portafolio/)){
+      addBot(`<strong>Modulo de Ventas por Marca:</strong>
+        <div style="font-size:11.5px;line-height:1.7;margin-top:6px;">
+        <p>Analisis detallado de ventas por marca, segmento y cliente. Incluye:</p>
+        <ul style="margin:4px 0 4px 16px;">
+          <li><b>Vista Global:</b> Top marcas consolidadas, segmentacion OTC/PC, crecimiento YoY</li>
+          <li><b>Por Pais:</b> Detalle de marcas y clientes por cada operacion</li>
+          <li><b>Estacionalidad:</b> Patrones trimestrales y heatmap por pais</li>
+          <li><b>Estrategico:</b> Marcas estrella, turnarounds, riesgos y recomendaciones</li>
+        </ul>
+        <p>Datos extraidos de 43 archivos de ventas (RV) cubriendo 15 paises, 2023-2025.</p></div>`);
+      return;
+    }
+    if(ql.match(/consolidado|total/)){
+      addBot(`<strong>Modulo Consolidado Total:</strong>
+        <div style="font-size:11.5px;line-height:1.7;margin-top:6px;">
+        <p>Vision consolidada de todas las operaciones de Genomma Lab:</p>
+        <ul style="margin:4px 0 4px 16px;">
+          <li><b>Estado de Resultados:</b> Ventas, costo, utilidad bruta, EBITDA, EBIT y utilidad neta</li>
+          <li><b>Informe para Inversionistas:</b> Narrativa ejecutiva de resultados</li>
+          <li><b>Trimestrales:</b> Comparativo Q por Q entre 2025 y 2024</li>
+        </ul></div>`);
+      return;
+    }
+    // General dashboard explanation
+    addBot(`<strong>Acerca de este Dashboard:</strong>
+      <div style="font-size:11.5px;line-height:1.7;margin-top:6px;">
+      <p>Este es el <b>Dashboard Financiero de Genomma Lab Internacional</b>, que consolida informacion de 2023 a 2025 para 16 paises. Tiene 5 secciones principales:</p>
+      <ol style="margin:6px 0 6px 18px;">
+        <li><b>Vista General:</b> Resumen ejecutivo y ranking de paises</li>
+        <li><b>Consolidado Total:</b> Estado de resultados consolidado</li>
+        <li><b>Benchmarking:</b> Comparacion con competidores del sector</li>
+        <li><b>Ventas por Marca:</b> Analisis de portafolio por marca, cliente y segmento</li>
+        <li><b>Paises individuales:</b> Detalle por cada operacion (sidebar)</li>
+      </ol>
+      <p>Todas las cifras estan en <b>millones de pesos mexicanos (MM MXN)</b>.</p></div>
+      <div class="ch-suggest">
+        <button onclick="askQ(this)">Explica la vista general</button>
+        <button onclick="askQ(this)">Explica el benchmarking</button>
+        <button onclick="askQ(this)">Explica ventas por marca</button>
+      </div>`);
+    return;
   }
 
   // ── BENCHMARK / COMPETITOR queries ──
