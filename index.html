@@ -2795,7 +2795,7 @@ renderGeneral();
         <button id="chat-close" onclick="toggleChat()">&times;</button>
       </div>
       <div id="chat-msgs"></div>
-      <input id="chat-apikey" type="hidden" value="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">
+      <input id="chat-apikey" type="hidden" value="">
       <span id="chat-ai-status" style="display:none;">🟢 Claude AI</span>
       <div id="chat-input-row">
         <input id="chat-input" placeholder="Pregunta lo que sea sobre el dashboard..." onkeydown="if(event.key==='Enter')sendChat()">
@@ -2805,6 +2805,7 @@ renderGeneral();
   `);
 
   setTimeout(()=>{
+    document.getElementById('chat-apikey').value='proxy';
     addBot(`¡Hola! Soy <strong>Genomma AI</strong>, tu asistente inteligente del dashboard financiero.<br><br>
     <div style="font-size:10.5px;color:#10b981;margin-bottom:8px;">✅ IA completa activada — Powered by Claude AI</div>
     Puedo responder preguntas con datos exactos, hacer análisis estratégicos, comparar competidores y más. ¡Pregunta lo que quieras!
@@ -2915,8 +2916,6 @@ function buildDashboardContext(){
 }
 
 async function callClaudeAPI(userMsg){
-  const apiKey=document.getElementById('chat-apikey').value.trim();
-  if(!apiKey)return null;
 
   // Build system prompt with dashboard data
   const dashData=buildDashboardContext();
@@ -2942,13 +2941,12 @@ ${dashData}`;
   if(chatHistory.length>6)chatHistory=chatHistory.slice(-6);
 
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    // PROXY_URL: Cambia esta URL por la de tu Cloudflare Worker
+    const PROXY_URL='https://genomma-ai-proxy.mendezomb.workers.dev';
+    const resp=await fetch(PROXY_URL,{
       method:'POST',
       headers:{
-        'Content-Type':'application/json',
-        'x-api-key':apiKey,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-access':'true'
+        'Content-Type':'application/json'
       },
       body:JSON.stringify({
         model:'claude-sonnet-4-20250514',
@@ -2960,11 +2958,7 @@ ${dashData}`;
 
     if(!resp.ok){
       const err=await resp.json().catch(()=>({}));
-      if(resp.status===401){
-        document.getElementById('chat-ai-status').innerHTML='🔴 Key inválida';
-        return null;
-      }
-      console.error('Claude API error:',err);
+      console.error('Proxy error:',resp.status,err);
       return null;
     }
 
@@ -3649,40 +3643,24 @@ function processQuery(q){
     return;
   }
 
-  // ── CLAUDE AI FALLBACK ──
-  const apiKey=document.getElementById('chat-apikey')?.value?.trim();
-  if(apiKey){
-    // Show typing indicator
-    const typing=document.createElement('div');typing.className='ch-msg bot';typing.id='typing-indicator';
-    typing.innerHTML='<div style="display:flex;gap:4px;align-items:center;"><span style="font-size:11px;color:#64748b;">Pensando</span><span class="typing-dots"><span>.</span><span>.</span><span>.</span></span></div>';
-    chatMsgs().appendChild(typing);chatMsgs().scrollTop=chatMsgs().scrollHeight;
+  // ── CLAUDE AI FALLBACK (via proxy) ──
+  const typing=document.createElement('div');typing.className='ch-msg bot';typing.id='typing-indicator';
+  typing.innerHTML='<div style="display:flex;gap:4px;align-items:center;"><span style="font-size:11px;color:#64748b;">Pensando</span><span class="typing-dots"><span>.</span><span>.</span><span>.</span></span></div>';
+  chatMsgs().appendChild(typing);chatMsgs().scrollTop=chatMsgs().scrollHeight;
 
-    callClaudeAPI(q).then(response=>{
-      const t=document.getElementById('typing-indicator');if(t)t.remove();
-      if(response){
-        addBot(response);
-      }else{
-        addBot(`No pude conectar con Claude AI. Verifica tu API key. Mientras tanto, prueba preguntas estructuradas:
-          <div class="ch-suggest">
-            <button onclick="askQ(this)">Resumen consolidado 2025</button>
-            <button onclick="askQ(this)">Top 5 países por EBITDA</button>
-            <button onclick="askQ(this)">¿Qué país creció más?</button>
-          </div>`);
-      }
-    });
-    return;
-  }
-
-  // No API key - show help
-  addBot(`Para responder preguntas complejas, ingresa tu <b>API Key de Anthropic</b> en el campo de arriba.<br><br>Sin API key, prueba con preguntas estructuradas:
-    <div class="ch-suggest">
-      <button onclick="askQ(this)">Resumen consolidado 2025</button>
-      <button onclick="askQ(this)">¿Cuánto vendió México?</button>
-      <button onclick="askQ(this)">Top 5 países por EBITDA</button>
-      <button onclick="askQ(this)">Compara Brasil vs Colombia</button>
-      <button onclick="askQ(this)">¿Qué país creció más?</button>
-      <button onclick="askQ(this)">Margen EBITDA de Argentina</button>
-    </div>`);
+  callClaudeAPI(q).then(response=>{
+    const t=document.getElementById('typing-indicator');if(t)t.remove();
+    if(response){
+      addBot(response);
+    }else{
+      addBot(`No pude conectar con Genomma AI en este momento. Prueba preguntas estructuradas:
+        <div class="ch-suggest">
+          <button onclick="askQ(this)">Resumen consolidado 2025</button>
+          <button onclick="askQ(this)">Top 5 países por EBITDA</button>
+          <button onclick="askQ(this)">¿Qué país creció más?</button>
+        </div>`);
+    }
+  });
 }
 </script>
 </body>
