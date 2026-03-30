@@ -3057,6 +3057,34 @@ function clrVar(v){return v!==null?(v>=0?'color:#10b981':'color:#ef4444'):'color
 function processQuery(q){
   const ql=q.toLowerCase();
 
+  // ══════════════════════════════════════════════════════════════
+  // TODO va a Claude AI. Si falla (sin créditos / key inválida),
+  // cae al motor de reglas local como respaldo.
+  // ══════════════════════════════════════════════════════════════
+  const typing=document.createElement('div');typing.className='ch-msg bot';typing.id='typing-indicator';
+  typing.innerHTML='<div style="display:flex;gap:4px;align-items:center;"><span style="font-size:11px;color:#64748b;">Analizando con IA</span><span class="typing-dots"><span>.</span><span>.</span><span>.</span></span></div>';
+  chatMsgs().appendChild(typing);chatMsgs().scrollTop=chatMsgs().scrollHeight;
+
+  callClaudeAPI(q).then(response=>{
+    const t=document.getElementById('typing-indicator');if(t)t.remove();
+    if(response){
+      addBot(response);
+    }else{
+      // Claude no disponible → fallback al motor de reglas local
+      addBot('⚠️ <b>IA no disponible</b> (sin créditos o error de conexión). Usando respuestas locales:');
+      processQueryLocal(q);
+    }
+  }).catch(()=>{
+    const t=document.getElementById('typing-indicator');if(t)t.remove();
+    addBot('⚠️ <b>IA no disponible.</b> Usando respuestas locales:');
+    processQueryLocal(q);
+  });
+}
+
+// Motor de reglas local (respaldo cuando Claude AI no está disponible)
+function processQueryLocal(q){
+  const ql=q.toLowerCase();
+
   // ── GREETINGS ──
   if(ql.match(/^(hola|hi|hello|hey|buenas?|buenos? d[ií]as?|buenas? tardes?|buenas? noches?|qué tal|que tal|saludos|qué onda|que onda|sup|cómo estás|como estas)\b/)){
     const greets=['Hola! Soy Genomma AI. Tengo acceso a todos los datos del dashboard. Puedo ayudarte con:','Buenos dias! Listo para responder tus preguntas sobre ventas, marcas y financieros:','Hola! Soy tu asistente de Genomma Lab. Preguntame lo que necesites:'];
@@ -3643,24 +3671,14 @@ function processQuery(q){
     return;
   }
 
-  // ── CLAUDE AI FALLBACK (via proxy) ──
-  const typing=document.createElement('div');typing.className='ch-msg bot';typing.id='typing-indicator';
-  typing.innerHTML='<div style="display:flex;gap:4px;align-items:center;"><span style="font-size:11px;color:#64748b;">Pensando</span><span class="typing-dots"><span>.</span><span>.</span><span>.</span></span></div>';
-  chatMsgs().appendChild(typing);chatMsgs().scrollTop=chatMsgs().scrollHeight;
-
-  callClaudeAPI(q).then(response=>{
-    const t=document.getElementById('typing-indicator');if(t)t.remove();
-    if(response){
-      addBot(response);
-    }else{
-      addBot(`No pude conectar con Genomma AI en este momento. Prueba preguntas estructuradas:
-        <div class="ch-suggest">
-          <button onclick="askQ(this)">Resumen consolidado 2025</button>
-          <button onclick="askQ(this)">Top 5 países por EBITDA</button>
-          <button onclick="askQ(this)">¿Qué país creció más?</button>
-        </div>`);
-    }
-  });
+  // Si ninguna regla local matcheó, mostrar sugerencias
+  addBot(`No encontré una respuesta local para eso. Prueba con:
+    <div class="ch-suggest">
+      <button onclick="askQ(this)">Resumen consolidado 2025</button>
+      <button onclick="askQ(this)">Top 5 países por EBITDA</button>
+      <button onclick="askQ(this)">¿Qué país creció más?</button>
+      <button onclick="askQ(this)">Compara Brasil vs Colombia</button>
+    </div>`);
 }
 </script>
 </body>
